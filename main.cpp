@@ -7,6 +7,7 @@
 #include <chrono>
 #include <functional>
 #include <deque>
+// #include <sys/resource.h>
 
 using namespace std;
 using time_interval_t = std::chrono::microseconds;
@@ -26,19 +27,19 @@ public:
     }
 
     void set(int i) {
-        data[i / 64] |= (1 << (i % 64));
+        data[i / 64] |= (1ULL << (i % 64));
     }
 
     void reset(int i) {
-        data[i / 64] &= ~(1 << (i % 64));
+        data[i / 64] &= ~(1ULL << (i % 64));
     }
 
     const bool test(int i) const {
-        return data[i / 64] & (1 << (i % 64));
+        return data[i / 64] & (1ULL << (i % 64));
     }
 
     void flip(int i) {
-        data[i / 64] ^= (1 << (i % 64));
+        data[i / 64] ^= (1ULL << (i % 64));
     }
 
     const int count() const {
@@ -162,21 +163,21 @@ unsigned long long countUnions(vector<hoodtype>& neighbourhoods) {
     //     }
     // }
     
-    cerr << "HOODS: " << endl;
-    for (hoodtype h : s1) {
-        h.print(cerr);
-        cerr << endl;
-    }
+    // cerr << "HOODS: " << endl;
+    // for (hoodtype h : s1) {
+    //     h.print(cerr);
+    //     cerr << endl;
+    // }
 
     return s1.size();
 }
 
 unsigned long long countUnions2(vector<hoodtype>& neighbourhoods) {
     unordered_set<hoodtype, node_hash> s1(1 << neighbourhoods.size());
-    vector<vector<hoodtype>> vs = *(new vector<vector<hoodtype>>());
-    for (int i = 0; i <= neighbourhoods.size(); i++) {
-        vs.push_back(vector<hoodtype>());
-    }
+    vector<hoodtype> vs[neighbourhoods.size() + 1];
+    // for (int i = 0; i <= neighbourhoods.size(); i++) {
+    //     vs[i] = hoodtype(); // vs.push_back(vector<hoodtype>());
+    // }
     s1.insert(hoodtype());
     vs[0].push_back(hoodtype());
     for (int i = 0; i < neighbourhoods.size(); i++) {
@@ -199,11 +200,10 @@ unsigned long long countUnions2(vector<hoodtype>& neighbourhoods) {
     return s1.size();
 }
 
-vector<hoodtype> connectedComponents(vector<hoodtype>& neighbourhoods, hoodtype subset) {
+void connectedComponents(vector<hoodtype>& components, const vector<hoodtype>& neighbourhoods, const hoodtype& subset) {
     hoodtype seen;
-    vector<hoodtype> ret;
 
-    subset.enumerate([&neighbourhoods, &subset, &seen, &ret] (int i) {
+    subset.enumerate([&components, &neighbourhoods, &subset, &seen] (int i) {
         if (seen.test(i)) {
             return false;
         }
@@ -217,67 +217,72 @@ vector<hoodtype> connectedComponents(vector<hoodtype>& neighbourhoods, hoodtype 
             q.pop_front();
             current.set(top);
             
-            (neighbourhoods[top] & subset).enumerate([&q, &seen] (int j) {
+            const hoodtype nbs = (neighbourhoods[top] & subset);
+            // cerr << "NBS: ";
+            // nbs.print(cerr);
+            nbs.enumerate([&q, &seen] (int j) {
+
+                // cerr << ", " << j;
+                // if (j > 32) {
+                //     throw "error";
+                // }
                 if (!seen.test(j)) {
                     q.push_back(j);
                     seen.set(j);
                 }
                 return false;
             });
+
+            // cerr << endl;
         }
         if (current != hoodtype()) {
-            ret.push_back(current);
+            components.push_back(current);
         }
 
         return false;
     });
-
-    if (ret.size() > 1) {
-        cerr << "components: " << ret.size() << endl;
-    }
-    
-    return ret;
 }
 
-unsigned long long CCMIS(int depth, vector<hoodtype>& neighbourhoods, const hoodtype mask, const hoodtype P, const hoodtype X) {
-    for (int i = 0; i < depth; i++) {
-        cerr << "--";
-    }
-    cerr << "P: ";
-    P.print(cerr);
-    cerr << " X: ";
-    X.print(cerr);
-    cerr << endl;
+unsigned long long CCMIS(int depth, const vector<hoodtype>& neighbourhoods, const hoodtype& mask, const hoodtype& P, const hoodtype& X) {
+    // for (int i = 0; i < depth; i++) {
+    //     cerr << "--";
+    // }
+    // cerr << "P: ";
+    // P.print(cerr);
+    // cerr << " X: ";
+    // X.print(cerr);
+    // cerr << endl;
 
     if ((P | X) == hoodtype()) {
-        cerr << "return 1" << endl;
+        // cerr << "return 1" << endl;
         return 1;
     }
     // if (P == hoodtype() && X != hoodtype()) {
-    //     cerr << "return 0" << endl;
+    //     // cerr << "return 0" << endl;
     //     return 0;
     // }
     bool found = X.enumerate([&neighbourhoods, &mask, &P] (int i) {
         const hoodtype Xhood = neighbourhoods[i] & mask;
         // if ((Xhood - P) == Xhood) {
         if ((Xhood & P) == hoodtype()) {
-            cerr << "w in X: " << i << " hood: ";
-            Xhood.print(cerr);
-            cerr << " P: ";
-            P.print(cerr);
-            cerr << endl;
+            // cerr << "w in X: " << i << " hood: ";
+            // Xhood.print(cerr);
+            // cerr << " P: ";
+            // P.print(cerr);
+            // cerr << endl;
             return true;
         }
         return false;
     });
     if (found) {
-        cerr << "return 0" << endl;
+        // cerr << "return 0" << endl;
         return 0;
     }
 
     unsigned long long count = 0;
 
-    vector<hoodtype> components = connectedComponents(neighbourhoods, (P | X) & mask);
+    vector<hoodtype> components;
+    connectedComponents(components, neighbourhoods, (P | X) & mask);
     if (components.size() > 1) {
 
         count = 1;
@@ -294,9 +299,13 @@ unsigned long long CCMIS(int depth, vector<hoodtype>& neighbourhoods, const hood
         v = i;
         return true;
     });
-    cerr << "V: " << v << " VHOOD: ";
-    (neighbourhoods[v] & mask).print(cerr);
-    cerr << endl;
+    if (v == -1) {
+        // cerr << "return 0" << endl;
+        throw "error: " + v;
+    }
+    // cerr << "V: " << v << " VHOOD: ";
+    // (neighbourhoods[v] & mask).print(cerr);
+    // cerr << endl;
     hoodtype PminNv = P - (neighbourhoods[v] & mask);
     PminNv.reset(v);
     hoodtype XminNv = X - (neighbourhoods[v] & mask);
@@ -311,8 +320,26 @@ unsigned long long CCMIS(int depth, vector<hoodtype>& neighbourhoods, const hood
 }
 
 int main() {
+    // const rlim_t kStackSize = 16 * 1024 * 1024;   // min stack size = 16 MB
+    // struct rlimit rl;
+    // int result;
+
+    // result = getrlimit(RLIMIT_STACK, &rl);
+    // if (result == 0)
+    // {
+    //     if (rl.rlim_cur < kStackSize)
+    //     {
+    //         rl.rlim_cur = kStackSize;
+    //         result = setrlimit(RLIMIT_STACK, &rl);
+    //         if (result != 0)
+    //         {
+    //             fprintf(stderr, "setrlimit returned result = %d\n", result);
+    //         }
+    //     }
+    // }
+
     vector<hoodtype> neighbourhoods;
-    const int maxi = 4;
+    const int maxi = 20;
     for (int i = 0; i < maxi; i++) {
         hoodtype hood;
         hood.set(i);
@@ -356,11 +383,11 @@ int main() {
             }
         }
     }
-    cerr << "NEIGHBOURHOODS2: " << endl;
-    for (hoodtype h : neighbourhoods2) {
-        h.print(cerr);
-        cerr << endl;
-    }
+    // cerr << "NEIGHBOURHOODS2: " << endl;
+    // for (hoodtype h : neighbourhoods2) {
+    //     h.print(cerr);
+    //     cerr << endl;
+    // }
     
     auto start3 = myClock::now();
     unsigned long long count3 = CCMIS(0, neighbourhoods2, P, P, X);
