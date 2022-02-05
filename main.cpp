@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <bitset>
 #include <set>
@@ -7,7 +8,8 @@
 #include <chrono>
 #include <functional>
 #include <deque>
-// #include <sys/resource.h>
+#include <sys/resource.h>
+#include <map>
 
 using namespace std;
 using time_interval_t = std::chrono::microseconds;
@@ -17,12 +19,13 @@ const bool DEBUG = true;
 
 template<std::size_t N>
 class BitSet {
-    static constexpr int Nlong = ceil(N / 64);
+    static constexpr int Nlong = ceil((float) N / 64);
     uint64_t data[Nlong];
 public:
     BitSet() {
+        // cerr << Nlong << endl;
         for (int i = 0; i < Nlong; i++) {
-            data[i] = 0;
+            data[i] = 0ULL;
         }
     }
 
@@ -35,6 +38,7 @@ public:
     }
 
     const bool test(int i) const {
+        // cerr << "I: " << i << endl;
         return data[i / 64] & (1ULL << (i % 64));
     }
 
@@ -51,7 +55,7 @@ public:
     }
 
     void print(std::ostream &os) const {
-        for (int i = 0; i < Nlong; i++) {
+        for (int i = Nlong - 1; i >= 0; i--) {
             os << bitset<64>(data[i]);
         }
     }
@@ -126,18 +130,23 @@ public:
             while (tmpX != 0) {
                 const int setbit = __builtin_ctzll(tmpX);
                 j += setbit;
+                // if ((j + i * 64) >= Nlong * 64) {
+                //     cerr << "JI: " << j << " " << i << " " << j + i * 64 << " setbit " << setbit << endl;
+                //     throw new out_of_range("error");
+                // }
                 if (f(j + i * 64)) {
                     return true;
                 }
                 j++;
-                tmpX >>= (setbit + 1);
+                tmpX >>= setbit;
+                tmpX >>= 1;
             }
         }
         return false;
     }
 };
 
-constexpr int N = 64;
+constexpr int N = 512;
 typedef BitSet<N> hoodtype;
 
 struct node_hash {
@@ -243,7 +252,7 @@ void connectedComponents(vector<hoodtype>& components, const vector<hoodtype>& n
     });
 }
 
-unsigned long long CCMIS(int depth, const vector<hoodtype>& neighbourhoods, const hoodtype& mask, const hoodtype& P, const hoodtype& X) {
+unsigned long long CCMIS(int depth, const vector<hoodtype>& neighbourhoods, const hoodtype& mask, const hoodtype& P, const hoodtype& X, map<int, int> ordering) {
     // for (int i = 0; i < depth; i++) {
     //     cerr << "--";
     // }
@@ -288,17 +297,43 @@ unsigned long long CCMIS(int depth, const vector<hoodtype>& neighbourhoods, cons
         count = 1;
         for (hoodtype component : components) {
             const hoodtype newmask = mask & component;
-            count *= CCMIS(depth + 1, neighbourhoods, newmask, P & newmask, X & newmask);
+            count *= CCMIS(depth + 1, neighbourhoods, newmask, P & newmask, X & newmask, ordering);
         }
 
         return count;
     }
 
     int v = -1;
-    P.enumerate([&v] (int i) {
-        v = i;
-        return true;
+    int maxd = 0;
+    P.enumerate([&neighbourhoods, &maxd, &v] (int i) {
+        if (maxd <= neighbourhoods[i].count()) {
+            maxd = neighbourhoods[i].count();
+            v = i;
+        }
+        return false;
     });
+
+    // int minIndex = 10000;
+    // P.enumerate([&neighbourhoods, &minIndex, &ordering, &v] (int i) {
+    //     int j = 0;
+    //     // TODO: optimize
+    //     int d = ordering[i];
+    //     if (d < minIndex) {
+    //         minIndex = d;
+    //         v = i;
+    //     }
+    //     // for (int n : ordering) {
+    //     //     // cerr << "N: " << n << " I: " << i << " J: " << j << " V: " << v << " MI: " << minIndex << endl;
+    //     //     if (n == i && j < minIndex) {
+    //     //         minIndex = j;
+    //     //         v = i;
+    //     //         break;
+    //     //     }
+    //     //     j++;
+    //     // }
+    //     return false;
+    // });
+
     if (v == -1) {
         // cerr << "return 0" << endl;
         throw "error: " + v;
@@ -309,37 +344,125 @@ unsigned long long CCMIS(int depth, const vector<hoodtype>& neighbourhoods, cons
     hoodtype PminNv = P - (neighbourhoods[v] & mask);
     PminNv.reset(v);
     hoodtype XminNv = X - (neighbourhoods[v] & mask);
-    count = CCMIS(depth + 1, neighbourhoods, mask, PminNv, XminNv);
+    count = CCMIS(depth + 1, neighbourhoods, mask, PminNv, XminNv, ordering);
     hoodtype Pminv = P;
     Pminv.reset(v);
     hoodtype Xuv = X;
     Xuv.set(v);
-    count += CCMIS(depth + 1, neighbourhoods, mask, Pminv, Xuv);
+    count += CCMIS(depth + 1, neighbourhoods, mask, Pminv, Xuv, ordering);
 
     return count;
 }
 
-int main() {
-    // const rlim_t kStackSize = 16 * 1024 * 1024;   // min stack size = 16 MB
-    // struct rlimit rl;
-    // int result;
+vector<hoodtype> readGraph() {
+    // string a, b;
+    // int c, d;
+    // cin << a << b << c << d;
+    // cin.ignore();
+    // cin << a << b << c << d;
+    
+    vector<hoodtype> neighbourhoods;
+    
+    string s;
 
-    // result = getrlimit(RLIMIT_STACK, &rl);
-    // if (result == 0)
-    // {
-    //     if (rl.rlim_cur < kStackSize)
-    //     {
-    //         rl.rlim_cur = kStackSize;
-    //         result = setrlimit(RLIMIT_STACK, &rl);
-    //         if (result != 0)
-    //         {
-    //             fprintf(stderr, "setrlimit returned result = %d\n", result);
-    //         }
-    //     }
-    // }
+    int edges = 0;
+
+    while (!cin.eof()) {
+        cin >> s;
+        if (s == "n") {
+            // neighbourhoods.push_back(hoodtype());
+        } else if (s == "e") {
+            int a, b;
+            cin >> a >> b;
+            if (neighbourhoods.size() <= max(a, b) + 2) {
+                neighbourhoods.resize(max(a, b) + 2);
+            }
+            // edges++;
+            neighbourhoods[a].set(b);
+            // cerr << a << " " << b << endl;
+            neighbourhoods[b].set(a);
+        }
+        getline(cin, s);
+    }
+
+    for (hoodtype hood : neighbourhoods) {
+        edges += hood.count();
+    }
+
+    int node = 0;
+    int realEdges = 0;
+    ofstream myfile;
+    myfile.open("graph.txt");
+    myfile << neighbourhoods.size() << " " << edges / 2 << endl; 
+    for (hoodtype hood : neighbourhoods) {
+        node++;
+        // if (hood.count() > 0) {
+        // myfile << node;
+        bool first = true;
+        hood.enumerate([&myfile, &realEdges, &first] (int i) {
+            if (!first) {
+                myfile << " ";
+            }
+            first = false;
+            myfile << (i + 1);
+            realEdges++;
+            return false;
+        });
+        myfile << endl;
+        // }
+    }
+    myfile.close();
+
+    int i = system("ndmetis -ccorder graph.txt");
+    // cerr << realEdges << endl;
+
+    return neighbourhoods;
+}
+
+map<int, int> readOrdering() {
+    vector<int> ordering;
+    ifstream ndmetisFile;
+    ndmetisFile.open("graph.txt.iperm");
+    while (!ndmetisFile.eof()) {
+        int n;
+        ndmetisFile >> n;
+        ndmetisFile.ignore();
+        ordering.push_back(n);
+    }
+    ordering.pop_back();
+    ndmetisFile.close();
+    cerr << "METIS: " << endl;
+    map<int, int> orderingMap;
+    for (int i = 0; i < ordering.size(); i++) {
+        cerr << ordering[i] << " ";
+        // orderingMap[ordering.size() - 1 - ordering[i]] = i;
+        orderingMap[ordering.size() - ordering[i] - 1] = i;
+    }
+    cerr << endl;
+    return orderingMap;
+}
+
+int main() {
+    const rlim_t kStackSize = 1024 * 1024 * 1024;   // min stack size = 1024 MB
+    struct rlimit rl;
+    int result;
+
+    result = getrlimit(RLIMIT_STACK, &rl);
+    if (result == 0)
+    {
+        if (rl.rlim_cur < kStackSize)
+        {
+            rl.rlim_cur = kStackSize;
+            result = setrlimit(RLIMIT_STACK, &rl);
+            if (result != 0)
+            {
+                fprintf(stderr, "setrlimit returned result = %d\n", result);
+            }
+        }
+    }
 
     vector<hoodtype> neighbourhoods;
-    const int maxi = 20;
+    const int maxi = 8;
     for (int i = 0; i < maxi; i++) {
         hoodtype hood;
         hood.set(i);
@@ -390,9 +513,32 @@ int main() {
     // }
     
     auto start3 = myClock::now();
-    unsigned long long count3 = CCMIS(0, neighbourhoods2, P, P, X);
+    map<int, int> defaultOrdering;
+    for (int i = 0; i < maxi * 2; i++) {
+        defaultOrdering[i] = i;
+    }
+    unsigned long long count3 = CCMIS(0, neighbourhoods2, P, P, X, defaultOrdering);
     const auto elapsed3 = std::chrono::duration_cast<time_interval_t>(myClock::now() - start3);
     cout << "count3: " << count3 << " in " << elapsed3.count() / 1000 << endl;
+
+    const vector<hoodtype> neighbourhoods3 = readGraph();
+    hoodtype P2 = hoodtype();
+    hoodtype X2 = hoodtype();
+    for (int i = 0; i < neighbourhoods3.size(); i++) {
+        P2.set(i);
+    }
+    map<int, int> ordering = readOrdering();
+    
+    // cerr << "NEIGHBOURHOODS3: " << endl;
+    // for (hoodtype h : neighbourhoods3) {
+    //     h.print(cerr);
+    //     cerr << endl;
+    // }
+    
+    auto start4 = myClock::now();
+    unsigned long long count4 = CCMIS(0, neighbourhoods3, P2, P2, X2, ordering);
+    const auto elapsed4 = std::chrono::duration_cast<time_interval_t>(myClock::now() - start4);
+    cout << "count4: " << count4 << " in " << elapsed4.count() / 1000 << endl;
 
     return 0;
 }
