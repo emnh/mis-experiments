@@ -146,7 +146,8 @@ public:
     }
 };
 
-constexpr int N = 512;
+// constexpr int N = 512;
+constexpr int N = 64;
 typedef BitSet<N> hoodtype;
 
 struct node_hash {
@@ -183,6 +184,7 @@ unsigned long long countUnions(vector<hoodtype>& neighbourhoods) {
 
 unsigned long long countUnions2(vector<hoodtype>& neighbourhoods) {
     unordered_set<hoodtype, node_hash> s1(1 << neighbourhoods.size());
+    // unordered_set<hoodtype, node_hash> s1(256);
     vector<hoodtype> vs[neighbourhoods.size() + 1];
     // for (int i = 0; i <= neighbourhoods.size(); i++) {
     //     vs[i] = hoodtype(); // vs.push_back(vector<hoodtype>());
@@ -191,6 +193,7 @@ unsigned long long countUnions2(vector<hoodtype>& neighbourhoods) {
     vs[0].push_back(hoodtype());
     for (int i = 0; i < neighbourhoods.size(); i++) {
         hoodtype current = neighbourhoods[i];
+        // vs[i + 1].reserve(s1.size() / 2);
         for (int j = 0; j <= i; j++) {
             for (hoodtype hood : vs[j]) {
                 hoodtype next = current | hood;
@@ -341,6 +344,38 @@ unsigned long long CCMIS(int depth, const vector<hoodtype>& neighbourhoods, cons
     // cerr << "V: " << v << " VHOOD: ";
     // (neighbourhoods[v] & mask).print(cerr);
     // cerr << endl;
+
+    const bool smallUnionsBruteForce = true;
+    if (smallUnionsBruteForce && P.count() <= 8) {
+        count = 0;
+        const int subsets = 1 << P.count();
+        for (uint64_t i = 0; i < subsets; i++) {
+            hoodtype subset;
+            hoodtype nbs;
+            hoodtype Xnew = X;
+            int seq = 0;
+            P.enumerate([
+                &neighbourhoods, &mask,
+                &subset, &nbs, &Xnew,
+                &seq, &i] (int j) {
+                if (i & (1ULL << seq)) {
+                    subset.set(j);
+                    nbs = nbs | (neighbourhoods[j] & mask);
+                } else {
+                    Xnew.set(j);
+                }
+                seq++;
+                return false;
+            });
+            if ((subset & nbs) == hoodtype() &&
+                (subset & Xnew) == hoodtype() &&
+                (Xnew - nbs) == hoodtype()) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     hoodtype PminNv = P - (neighbourhoods[v] & mask);
     PminNv.reset(v);
     hoodtype XminNv = X - (neighbourhoods[v] & mask);
@@ -462,7 +497,7 @@ int main() {
     }
 
     vector<hoodtype> neighbourhoods;
-    const int maxi = 8;
+    const int maxi = 20;
     for (int i = 0; i < maxi; i++) {
         hoodtype hood;
         hood.set(i);
