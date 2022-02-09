@@ -147,7 +147,7 @@ public:
 };
 
 // constexpr int N = 512;
-constexpr int N = 64;
+constexpr int N = 128;
 typedef BitSet<N> hoodtype;
 
 struct node_hash {
@@ -156,7 +156,7 @@ struct node_hash {
     }
 };
 
-unsigned long long countUnions(vector<hoodtype>& neighbourhoods) {
+unsigned long long countUnions(const vector<hoodtype>& neighbourhoods) {
     unordered_set<hoodtype, node_hash> s1(1 << neighbourhoods.size());
     vector<hoodtype> s2;
     s1.insert(hoodtype());
@@ -182,8 +182,9 @@ unsigned long long countUnions(vector<hoodtype>& neighbourhoods) {
     return s1.size();
 }
 
-unsigned long long countUnions2(vector<hoodtype>& neighbourhoods) {
-    unordered_set<hoodtype, node_hash> s1(1 << neighbourhoods.size());
+unsigned long long countUnions2(const vector<hoodtype>& neighbourhoods) {
+    // unordered_set<hoodtype, node_hash> s1(1 << neighbourhoods.size());
+    unordered_set<hoodtype, node_hash> s1(256);
     // unordered_set<hoodtype, node_hash> s1(256);
     vector<hoodtype> vs[neighbourhoods.size() + 1];
     // for (int i = 0; i <= neighbourhoods.size(); i++) {
@@ -212,16 +213,64 @@ unsigned long long countUnions2(vector<hoodtype>& neighbourhoods) {
     return s1.size();
 }
 
-void connectedComponents(vector<hoodtype>& components, const vector<hoodtype>& neighbourhoods, const hoodtype& subset) {
-    hoodtype seen;
+unsigned long long countUnionsWithMask(
+    vector<hoodtype>& neighbourhoods,
+    const hoodtype& exclusionMask) {
+    unordered_set<hoodtype, node_hash> s1(1 << neighbourhoods.size());
+    // unordered_set<hoodtype, node_hash> s1(256);
+    vector<hoodtype> vs[neighbourhoods.size() + 1];
+    // for (int i = 0; i <= neighbourhoods.size(); i++) {
+    //     vs[i] = hoodtype(); // vs.push_back(vector<hoodtype>());
+    // }
+    s1.insert(hoodtype());
+    vs[0].push_back(hoodtype());
+    for (int i = 0; i < neighbourhoods.size(); i++) {
+        hoodtype current = neighbourhoods[i];
+        // vs[i + 1].reserve(s1.size() / 2);
+        for (int j = 0; j <= i; j++) {
+            for (hoodtype hood : vs[j]) {
+                hoodtype next = (current | hood) - exclusionMask;
+                if (s1.find(next) == s1.end()) {
+                    s1.insert(next);
+                    vs[i + 1].push_back(next);
+                }
+            }
+        }
+    }
+    // cerr << "HOODS: " << endl;
+    // for (hoodtype h : s1) {
+    //     h.print(cerr);
+    //     cerr << endl;
+    // }
+    return s1.size();
+}
 
-    subset.enumerate([&components, &neighbourhoods, &subset, &seen] (int i) {
+void connectedComponents(
+    vector<hoodtype>& components,
+    const vector<hoodtype>& neighbourhoods,
+    const hoodtype& subset,
+    bool& isBipartite,
+    hoodtype &left,
+    hoodtype &right) {
+    
+    hoodtype seen;
+    hoodtype seenRed;
+    hoodtype seenBlue;
+    isBipartite = true;
+    int bipartiteErrors = 0;
+
+    subset.enumerate([
+        &components, &neighbourhoods, &subset,
+        &seen, &seenRed, &seenBlue,
+        &isBipartite,
+        &bipartiteErrors] (int i) {
         if (seen.test(i)) {
             return false;
         }
         deque<int> q;
         q.push_back(i);
         seen.set(i);
+        seenRed.set(i);
         hoodtype current;
 
         while (!q.empty()) {
@@ -229,18 +278,41 @@ void connectedComponents(vector<hoodtype>& components, const vector<hoodtype>& n
             q.pop_front();
             current.set(top);
             
-            const hoodtype nbs = (neighbourhoods[top] & subset);
-            // cerr << "NBS: ";
-            // nbs.print(cerr);
-            nbs.enumerate([&q, &seen] (int j) {
+            const bool topIsRed = seenRed.test(top);
 
-                // cerr << ", " << j;
-                // if (j > 32) {
-                //     throw "error";
-                // }
+            const hoodtype nbs = (neighbourhoods[top] & subset);
+            
+            // if (topIsRed) {
+            //     seenBlue = (seenBlue | nbs);
+            // } else {
+            //     seenRed = (seenRed | nbs);
+            // }
+
+            nbs.enumerate([
+                &q, &top, &seen,
+                &topIsRed, &seenRed, &seenBlue,
+                &bipartiteErrors] (int j) {
                 if (!seen.test(j)) {
                     q.push_back(j);
                     seen.set(j);
+
+                    if (topIsRed) {
+                        seenBlue.set(j);
+                    } else {
+                        seenRed.set(j);
+                    }
+                } else if (top != j) {
+                    if (topIsRed) {
+                        if (!seenBlue.test(j)) {
+                            bipartiteErrors++;
+                        }
+                        seenBlue.set(j);
+                    } else {
+                        if (!seenRed.test(j)) {
+                            bipartiteErrors++;
+                        }
+                        seenRed.set(j);
+                    }
                 }
                 return false;
             });
@@ -253,6 +325,16 @@ void connectedComponents(vector<hoodtype>& components, const vector<hoodtype>& n
 
         return false;
     });
+
+    // isBipartite = true;
+        // (seenRed | seenBlue) == subset &&
+        // (seenRed & seenBlue).count() <= 0 &&
+        // bipartiteErrors <= 20;
+        // (seenRed & seenBlue) == hoodtype();
+    if (isBipartite) {
+        left = seenRed;
+        right = seenBlue;
+    }
 }
 
 unsigned long long CCMIS(int depth, const vector<hoodtype>& neighbourhoods, const hoodtype& mask, const hoodtype& P, const hoodtype& X, map<int, int> ordering) {
@@ -294,7 +376,18 @@ unsigned long long CCMIS(int depth, const vector<hoodtype>& neighbourhoods, cons
     unsigned long long count = 0;
 
     vector<hoodtype> components;
-    connectedComponents(components, neighbourhoods, (P | X) & mask);
+    bool isBipartite = false;
+    hoodtype left;
+    hoodtype right;
+    // TODO: Only check if it is connected if we removed a node
+    connectedComponents(
+        components,
+        neighbourhoods,
+        (P | X) & mask,
+        isBipartite,
+        left,
+        right);
+
     if (components.size() > 1) {
 
         count = 1;
@@ -304,6 +397,33 @@ unsigned long long CCMIS(int depth, const vector<hoodtype>& neighbourhoods, cons
         }
 
         return count;
+    }
+
+    const bool countBipartite = true;
+    if (countBipartite && isBipartite &&
+        // max(left.count(), right.count()) >= 10 &&
+        min((left).count(), (right).count()) <= 20) {
+        // ((X - left) == hoodtype() ||
+        //  (X - right) == hoodtype())) {
+        vector<hoodtype> neighbourhoodsOfMin;
+        const hoodtype& minset = left.count() < right.count() ? left : right;
+        const hoodtype& maxset = left.count() < right.count() ? right : left;
+        // const hoodtype& minset = (X - left) == hoodtype() ? left : right;
+        // const hoodtype& maxset = (X - left) == hoodtype() ? right : left;
+        // cerr << "bipartite" << endl;
+        (((minset - X) & mask)).enumerate([
+            &neighbourhoods, &mask, &X,
+            &neighbourhoodsOfMin,&maxset] (int i) {
+            neighbourhoodsOfMin.push_back(((neighbourhoods[i] & (maxset - X)) & mask));
+            return false;
+        });
+        return countUnions2(neighbourhoodsOfMin);
+        // return countUnionsWithMask(neighbourhoodsOfMin, X);
+        // cerr << "bipartite: ";
+        // left.print(cerr);
+        // cerr << " ";
+        // right.print(cerr);
+        // cerr << endl;
     }
 
     int v = -1;
@@ -345,7 +465,7 @@ unsigned long long CCMIS(int depth, const vector<hoodtype>& neighbourhoods, cons
     // (neighbourhoods[v] & mask).print(cerr);
     // cerr << endl;
 
-    const bool smallUnionsBruteForce = true;
+    const bool smallUnionsBruteForce = false;
     if (smallUnionsBruteForce && P.count() <= 8) {
         count = 0;
         const int subsets = 1 << P.count();
@@ -574,6 +694,8 @@ int main() {
     unsigned long long count4 = CCMIS(0, neighbourhoods3, P2, P2, X2, ordering);
     const auto elapsed4 = std::chrono::duration_cast<time_interval_t>(myClock::now() - start4);
     cout << "count4: " << count4 << " in " << elapsed4.count() / 1000 << endl;
+
+    // cout << "count5: " << countUnions2(neighbourhoods3) << endl;
 
     return 0;
 }
