@@ -10,6 +10,7 @@
 #include <deque>
 #include <sys/resource.h>
 #include <map>
+#include <algorithm>
 
 using namespace std;
 using time_interval_t = std::chrono::microseconds;
@@ -155,6 +156,17 @@ struct node_hash {
         return std::hash<std::uint64_t>()(node.hash());
     }
 };
+
+void FisherYates(vector<int>& player) { //implementation of Fisher
+     int i, j, tmp; // create local variables to hold values for shuffle
+
+     for (i = player.size() - 1; i > 0; i--) { // for loop to shuffle
+         j = rand() % (i + 1); //randomise j for shuffle with Fisher Yates
+         tmp = player[j];
+         player[j] = player[i];
+         player[i] = tmp;
+     }
+}
 
 unsigned long long countUnions(vector<hoodtype>& neighbourhoods) {
     unordered_set<hoodtype, node_hash> s1(1 << neighbourhoods.size());
@@ -343,7 +355,108 @@ void connectedComponents(
     }
 }
 
-unsigned long long CCMIS(int depth, const vector<hoodtype>& neighbourhoods, const hoodtype& mask, const hoodtype& P, const hoodtype& X, map<int, int> ordering) {
+unsigned long long CCMISProbe(
+    int depth, const vector<hoodtype>& neighbourhoods, const hoodtype& mask,
+    const hoodtype& P, const hoodtype& X, vector<int> ordering) {
+    if ((P | X) == hoodtype()) {
+        return depth;
+    }
+    bool found = X.enumerate([&neighbourhoods, &mask, &P] (int i) {
+        const hoodtype Xhood = neighbourhoods[i] & mask;
+        if ((Xhood & P) == hoodtype()) {
+            return true;
+        }
+        return false;
+    });
+    if (found) {
+        return depth;
+    }
+
+    unsigned long long count = 0;
+
+    vector<hoodtype> components;
+    bool isBipartite = false;
+    hoodtype left;
+    hoodtype right;
+    // TODO: Only check if it is connected if we removed a node
+    connectedComponents(
+        components,
+        neighbourhoods,
+        (P | X) & mask,
+        isBipartite,
+        left,
+        right);
+
+    if (components.size() > 1) {
+        int maxComponentSize = 0;
+        int maxComponentIndex = -1;
+
+        int i = 0;
+        for (hoodtype component : components) {
+            if (component.count() >= maxComponentSize) {
+                maxComponentSize = component.count();
+                maxComponentIndex = i; 
+            }
+            i++;
+        }
+
+        const hoodtype component = components[maxComponentIndex];
+        const hoodtype newmask = mask & component;
+        count =
+            CCMISProbe(
+                depth, neighbourhoods, newmask, 
+                P & newmask, X & newmask, ordering);
+
+        return count;
+    }
+
+    int v = ordering[depth];
+    if (depth >= ordering.size()) {
+        throw out_of_range("ordering");
+    }
+    for (int i = depth; i < ordering.size(); i++) {
+        if (P.test(ordering[i])) {
+            v = ordering[i];
+            break;
+        }
+    }
+    if (!(P).test(v)) {
+        P.enumerate([&v](int i) {
+            v = i;
+            return true;
+        });
+        // throw out_of_range("v-ordering");
+    }
+    // int v = -1;
+    // int maxd = 0;
+    // P.enumerate([&neighbourhoods, &P, &mask, &maxd, &v] (int i) {
+    //     const int d = (neighbourhoods[i]).count(); 
+    //     if (maxd <= d) {
+    //         maxd = d;
+    //         v = i;
+    //     }
+    //     return false;
+    // });
+
+    if (rand() % 2 == 0) {
+        hoodtype PminNv = P - (neighbourhoods[v] & mask);
+        PminNv.reset(v);
+        hoodtype XminNv = X - (neighbourhoods[v] & mask);
+        count = CCMISProbe(depth + 1, neighbourhoods, mask, PminNv, XminNv, ordering);    
+    } else {
+        hoodtype Pminv = P;
+        Pminv.reset(v);
+        hoodtype Xuv = X;
+        Xuv.set(v);
+        count += CCMISProbe(depth + 1, neighbourhoods, mask, Pminv, Xuv, ordering);
+    }
+    
+    return count;
+}
+
+unsigned long long CCMIS(
+    int depth, const vector<hoodtype>& neighbourhoods, const hoodtype& mask,
+    const hoodtype& P, const hoodtype& X, vector<int> ordering) {
     // for (int i = 0; i < depth; i++) {
     //     cerr << "--";
     // }
@@ -381,6 +494,95 @@ unsigned long long CCMIS(int depth, const vector<hoodtype>& neighbourhoods, cons
 
     unsigned long long count = 0;
 
+    int v = ordering[depth];
+    if (depth >= ordering.size()) {
+        throw out_of_range("ordering");
+    }
+    for (int i = depth; i < ordering.size(); i++) {
+        if (P.test(ordering[i])) {
+            v = ordering[i];
+            break;
+        }
+    }
+    if (!(P).test(v)) { 
+        P.enumerate([&v](int i) {
+            v = i;
+            return true;
+        });
+        // throw out_of_range("v-ordering");
+    }
+    // if (!P.test(v)) {
+    //     throw out_of_range("v-ordering");
+    // }
+
+    if (P.count() >= 32 && depth <= 0) {
+        int maxd = 0;
+        vector<int> Pset;
+        for (int i = 0; i < depth; i++) {
+            Pset.push_back(ordering[i]);
+        }
+        P.enumerate([&neighbourhoods, &Pset, &P, &mask, &maxd, &v] (int i) {
+            const int d = (neighbourhoods[i]).count(); 
+            // const int d = (neighbourhoods[i]).count(); 
+            if (maxd <= d) {
+                maxd = d;
+                v = i;
+            }
+            Pset.push_back(i);
+            return false;
+        });
+        sort(Pset.begin(), Pset.end(), 
+            [&neighbourhoods](const int& a, const int& b) 
+                { 
+                    return neighbourhoods[a].count() > neighbourhoods[b].count();
+                });
+        
+        int mindepth = 0;
+        int minv = v;
+        vector<int> minOrdering = Pset;
+
+        const int maxj = 20;
+
+        for (int j = 0; j < maxj; j++) {
+            mindepth += CCMISProbe(depth, neighbourhoods, mask, P, X, minOrdering);
+        }
+
+        for (int i = 0; i < Pset.size(); i++) {
+            
+            // const int v2 = Pset[i];
+
+            vector<int> newOrdering =
+                vector<int>(ordering.begin(), ordering.end());
+            FisherYates(newOrdering);
+
+            int d = 0;
+            for (int j = 0; j < maxj; j++) {
+                d += CCMISProbe(depth, neighbourhoods, mask, P, X, newOrdering);
+            }
+                
+            if (d <= mindepth) {
+                mindepth = d;
+                // minv = v2;
+                minOrdering = newOrdering;
+            }
+        }
+        ordering = minOrdering;
+        v = ordering[depth];
+        for (int i = depth; i < ordering.size(); i++) {
+            if (P.test(ordering[i])) {
+                v = ordering[i];
+                break;
+            }
+        }
+        if (!(P).test(v)) {
+            P.enumerate([&v](int i) {
+                v = i;
+                return true;
+            });
+            // throw out_of_range("v-ordering");
+        }
+    }
+
     vector<hoodtype> components;
     bool isBipartite = false;
     hoodtype left;
@@ -399,7 +601,7 @@ unsigned long long CCMIS(int depth, const vector<hoodtype>& neighbourhoods, cons
         count = 1;
         for (hoodtype component : components) {
             const hoodtype newmask = mask & component;
-            count *= CCMIS(depth + 1, neighbourhoods, newmask, P & newmask, X & newmask, ordering);
+            count *= CCMIS(depth, neighbourhoods, newmask, P & newmask, X & newmask, ordering);
         }
 
         return count;
@@ -408,7 +610,7 @@ unsigned long long CCMIS(int depth, const vector<hoodtype>& neighbourhoods, cons
     const bool countBipartite = false;
     if (countBipartite && isBipartite &&
         // max(left.count(), right.count()) >= 4 && 
-        min(left.count(), right.count()) <= 20 && X == hoodtype()) { 
+        min(left.count(), right.count()) <= 20) { 
         // ((X - left) == hoodtype() ||
         //  (X - right) == hoodtype())) {
         vector<hoodtype> neighbourhoodsOfMin;
@@ -425,7 +627,7 @@ unsigned long long CCMIS(int depth, const vector<hoodtype>& neighbourhoods, cons
             &neighbourhoods, &mask, &X, &NX,
             &neighbourhoodsOfMin, &maxset] (int i) {
             neighbourhoodsOfMin.push_back(
-                (((neighbourhoods[i] & maxset) - (X | NX)) & mask));
+                ((((neighbourhoods[i] | (X | NX)) & maxset)) & mask));
             return false;
         });
         return countUnions2(neighbourhoodsOfMin);
@@ -437,15 +639,7 @@ unsigned long long CCMIS(int depth, const vector<hoodtype>& neighbourhoods, cons
         // cerr << endl;
     }
 
-    int v = -1;
-    int maxd = 0;
-    P.enumerate([&neighbourhoods, &maxd, &v] (int i) {
-        if (maxd <= neighbourhoods[i].count()) {
-            maxd = neighbourhoods[i].count();
-            v = i;
-        }
-        return false;
-    });
+    
 
     // int minIndex = 10000;
     // P.enumerate([&neighbourhoods, &minIndex, &ordering, &v] (int i) {
@@ -507,16 +701,18 @@ unsigned long long CCMIS(int depth, const vector<hoodtype>& neighbourhoods, cons
         return count;
     }
 
-    hoodtype PminNv = P - (neighbourhoods[v] & mask);
-    PminNv.reset(v);
-    hoodtype XminNv = X - (neighbourhoods[v] & mask);
-    count = CCMIS(depth + 1, neighbourhoods, mask, PminNv, XminNv, ordering);
-    hoodtype Pminv = P;
-    Pminv.reset(v);
-    hoodtype Xuv = X;
-    Xuv.set(v);
-    count += CCMIS(depth + 1, neighbourhoods, mask, Pminv, Xuv, ordering);
-
+    {
+        hoodtype PminNv = P - (neighbourhoods[v] & mask);
+        PminNv.reset(v);
+        hoodtype XminNv = X - (neighbourhoods[v] & mask);
+        count = CCMIS(depth + 1, neighbourhoods, mask, PminNv, XminNv, ordering);
+        hoodtype Pminv = P;
+        Pminv.reset(v);
+        hoodtype Xuv = X;
+        Xuv.set(v);
+        count += CCMIS(depth + 1, neighbourhoods, mask, Pminv, Xuv, ordering);
+    }
+    
     return count;
 }
 
@@ -683,9 +879,9 @@ int main() {
     // }
     
     auto start3 = myClock::now();
-    map<int, int> defaultOrdering;
+    vector<int> defaultOrdering;
     for (int i = 0; i < maxi * 2; i++) {
-        defaultOrdering[i] = i;
+        defaultOrdering.push_back(i);
     }
     unsigned long long count3 = CCMIS(0, neighbourhoods2, P, P, X, defaultOrdering);
     const auto elapsed3 = std::chrono::duration_cast<time_interval_t>(myClock::now() - start3);
@@ -694,10 +890,17 @@ int main() {
     const vector<hoodtype> neighbourhoods3 = readGraph();
     hoodtype P2 = hoodtype();
     hoodtype X2 = hoodtype();
+    vector<int> ordering;
     for (int i = 0; i < neighbourhoods3.size(); i++) {
         P2.set(i);
+        ordering.push_back(i);
     }
-    map<int, int> ordering = defaultOrdering; // readOrdering();
+    sort(ordering.begin(), ordering.end(), 
+            [&neighbourhoods3](const int& a, const int& b) 
+                { 
+                    return neighbourhoods3[a].count() > neighbourhoods3[b].count();
+                });
+    // vector<int> ordering = defaultOrdering; // readOrdering();
     
     // cerr << "NEIGHBOURHOODS3: " << endl;
     // for (hoodtype h : neighbourhoods3) {
