@@ -157,10 +157,10 @@ struct node_hash {
     }
 };
 
-void FisherYates(vector<int>& player) { //implementation of Fisher
+void FisherYates(vector<int>& player, int from) { //implementation of Fisher
      int i, j, tmp; // create local variables to hold values for shuffle
 
-     for (i = player.size() - 1; i > 0; i--) { // for loop to shuffle
+     for (i = player.size() - 1; i > from; i--) { // for loop to shuffle
          j = rand() % (i + 1); //randomise j for shuffle with Fisher Yates
          tmp = player[j];
          player[j] = player[i];
@@ -515,7 +515,7 @@ unsigned long long CCMIS(
     //     throw out_of_range("v-ordering");
     // }
 
-    if (P.count() >= 32 && depth <= 0) {
+    if (P.count() >= 32 && depth < 0) {
         int maxd = 0;
         vector<int> Pset;
         for (int i = 0; i < depth; i++) {
@@ -539,7 +539,8 @@ unsigned long long CCMIS(
         
         int mindepth = 0;
         int minv = v;
-        vector<int> minOrdering = Pset;
+        // vector<int> minOrdering = Pset;
+        vector<int> minOrdering = ordering;
 
         const int maxj = 20;
 
@@ -553,7 +554,7 @@ unsigned long long CCMIS(
 
             vector<int> newOrdering =
                 vector<int>(ordering.begin(), ordering.end());
-            FisherYates(newOrdering);
+            FisherYates(newOrdering, depth);
 
             int d = 0;
             for (int j = 0; j < maxj; j++) {
