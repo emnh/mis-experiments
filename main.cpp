@@ -146,8 +146,8 @@ public:
     }
 };
 
-// constexpr int N = 512;
-constexpr int N = 128;
+constexpr int N = 512;
+// constexpr int N = 128;
 typedef BitSet<N> hoodtype;
 
 struct node_hash {
@@ -156,7 +156,7 @@ struct node_hash {
     }
 };
 
-unsigned long long countUnions(const vector<hoodtype>& neighbourhoods) {
+unsigned long long countUnions(vector<hoodtype>& neighbourhoods) {
     unordered_set<hoodtype, node_hash> s1(1 << neighbourhoods.size());
     vector<hoodtype> s2;
     s1.insert(hoodtype());
@@ -182,9 +182,8 @@ unsigned long long countUnions(const vector<hoodtype>& neighbourhoods) {
     return s1.size();
 }
 
-unsigned long long countUnions2(const vector<hoodtype>& neighbourhoods) {
-    // unordered_set<hoodtype, node_hash> s1(1 << neighbourhoods.size());
-    unordered_set<hoodtype, node_hash> s1(256);
+unsigned long long countUnions2(vector<hoodtype>& neighbourhoods) {
+    unordered_set<hoodtype, node_hash> s1(1 << neighbourhoods.size());
     // unordered_set<hoodtype, node_hash> s1(256);
     vector<hoodtype> vs[neighbourhoods.size() + 1];
     // for (int i = 0; i <= neighbourhoods.size(); i++) {
@@ -257,13 +256,11 @@ void connectedComponents(
     hoodtype seenRed;
     hoodtype seenBlue;
     isBipartite = true;
-    int bipartiteErrors = 0;
 
     subset.enumerate([
         &components, &neighbourhoods, &subset,
         &seen, &seenRed, &seenBlue,
-        &isBipartite,
-        &bipartiteErrors] (int i) {
+        &isBipartite] (int i) {
         if (seen.test(i)) {
             return false;
         }
@@ -278,41 +275,50 @@ void connectedComponents(
             q.pop_front();
             current.set(top);
             
-            const bool topIsRed = seenRed.test(top);
+            const bool isTopRed = seenRed.test(top);
+            if (isTopRed && seenBlue.test(top)) {
+                isBipartite = false;
+            }
 
             const hoodtype nbs = (neighbourhoods[top] & subset);
-            
-            // if (topIsRed) {
-            //     seenBlue = (seenBlue | nbs);
-            // } else {
-            //     seenRed = (seenRed | nbs);
-            // }
 
+            if (isTopRed) {
+                seenBlue = seenBlue | nbs;
+            } else {
+                seenRed = seenRed | nbs;
+            }
+ 
+            // cerr << "NBS: ";
+            // nbs.print(cerr);
             nbs.enumerate([
-                &q, &top, &seen,
-                &topIsRed, &seenRed, &seenBlue,
-                &bipartiteErrors] (int j) {
+                &q, &top, &seen, 
+                &seenRed, &seenBlue,
+                &isBipartite] (int j) {
+
+                // cerr << ", " << j;
+                // if (j > 32) {
+                //     throw "error";
+                // }
                 if (!seen.test(j)) {
                     q.push_back(j);
                     seen.set(j);
-
-                    if (topIsRed) {
-                        seenBlue.set(j);
-                    } else {
-                        seenRed.set(j);
-                    }
-                } else if (top != j) {
-                    if (topIsRed) {
-                        if (!seenBlue.test(j)) {
-                            bipartiteErrors++;
-                        }
-                        seenBlue.set(j);
-                    } else {
-                        if (!seenRed.test(j)) {
-                            bipartiteErrors++;
-                        }
-                        seenRed.set(j);
-                    }
+                    // if (seenRed.test(top)) {
+                    //     if (seenRed.test(j)) {
+                    //         isBipartite = false;
+                    //     }
+                    //     seenBlue.set(j);
+                    // } else if (seenBlue.test(top)) {
+                    //     if (seenBlue.test(j)) {
+                    //         isBipartite = false;
+                    //     }
+                    //     seenRed.set(j);
+                    // }
+                // } else if (top != j) {
+                //     if (seenRed.test(top) && seenRed.test(j)) {
+                //         isBipartite = false;
+                //     } else if (seenBlue.test(top) && seenBlue.test(j)) {
+                //         isBipartite = false;
+                //     }
                 }
                 return false;
             });
@@ -326,11 +332,11 @@ void connectedComponents(
         return false;
     });
 
-    // isBipartite = true;
-        // (seenRed | seenBlue) == subset &&
-        // (seenRed & seenBlue).count() <= 0 &&
-        // bipartiteErrors <= 20;
-        // (seenRed & seenBlue) == hoodtype();
+    isBipartite =
+        isBipartite &&
+        ((seenBlue | seenRed) == subset) &&
+        ((seenBlue & seenRed) == hoodtype());
+
     if (isBipartite) {
         left = seenRed;
         right = seenBlue;
@@ -399,10 +405,10 @@ unsigned long long CCMIS(int depth, const vector<hoodtype>& neighbourhoods, cons
         return count;
     }
 
-    const bool countBipartite = true;
+    const bool countBipartite = false;
     if (countBipartite && isBipartite &&
-        // max(left.count(), right.count()) >= 10 &&
-        min((left).count(), (right).count()) <= 20) {
+        // max(left.count(), right.count()) >= 4 && 
+        min(left.count(), right.count()) <= 20 && X == hoodtype()) { 
         // ((X - left) == hoodtype() ||
         //  (X - right) == hoodtype())) {
         vector<hoodtype> neighbourhoodsOfMin;
@@ -410,11 +416,16 @@ unsigned long long CCMIS(int depth, const vector<hoodtype>& neighbourhoods, cons
         const hoodtype& maxset = left.count() < right.count() ? right : left;
         // const hoodtype& minset = (X - left) == hoodtype() ? left : right;
         // const hoodtype& maxset = (X - left) == hoodtype() ? right : left;
-        // cerr << "bipartite" << endl;
-        (((minset - X) & mask)).enumerate([
-            &neighbourhoods, &mask, &X,
-            &neighbourhoodsOfMin,&maxset] (int i) {
-            neighbourhoodsOfMin.push_back(((neighbourhoods[i] & (maxset - X)) & mask));
+        hoodtype NX;
+        X.enumerate([&neighbourhoods, &mask, &NX] (int i) {
+            NX = NX | (neighbourhoods[i] & mask); 
+            return false;
+        });
+        ((minset - (X | NX)) & mask).enumerate([
+            &neighbourhoods, &mask, &X, &NX,
+            &neighbourhoodsOfMin, &maxset] (int i) {
+            neighbourhoodsOfMin.push_back(
+                (((neighbourhoods[i] & maxset) - (X | NX)) & mask));
             return false;
         });
         return countUnions2(neighbourhoodsOfMin);
@@ -532,6 +543,9 @@ vector<hoodtype> readGraph() {
             if (neighbourhoods.size() <= max(a, b) + 2) {
                 neighbourhoods.resize(max(a, b) + 2);
             }
+            if (a >= N || b >= N) {
+                throw out_of_range("graph size: N");
+            }
             // edges++;
             neighbourhoods[a].set(b);
             // cerr << a << " " << b << endl;
@@ -568,7 +582,8 @@ vector<hoodtype> readGraph() {
     }
     myfile.close();
 
-    int i = system("ndmetis -ccorder graph.txt");
+    // int i = system("ndmetis -ccorder graph.txt");
+    cerr << "SKIPPING METIS" << endl;
     // cerr << realEdges << endl;
 
     return neighbourhoods;
@@ -628,11 +643,11 @@ int main() {
         neighbourhoods.push_back(hood);
     }
 
-    cerr << "NEIGHBOURHOODS: " << endl;
-    for (hoodtype h : neighbourhoods) {
-        h.print(cerr);
-        cerr << endl;
-    }
+    // cerr << "NEIGHBOURHOODS: " << endl;
+    // for (hoodtype h : neighbourhoods) {
+    //     h.print(cerr);
+    //     cerr << endl;
+    // }
 
     auto start = myClock::now();
     unsigned long long count = countUnions(neighbourhoods);
@@ -682,7 +697,7 @@ int main() {
     for (int i = 0; i < neighbourhoods3.size(); i++) {
         P2.set(i);
     }
-    map<int, int> ordering = readOrdering();
+    map<int, int> ordering = defaultOrdering; // readOrdering();
     
     // cerr << "NEIGHBOURHOODS3: " << endl;
     // for (hoodtype h : neighbourhoods3) {
@@ -694,8 +709,6 @@ int main() {
     unsigned long long count4 = CCMIS(0, neighbourhoods3, P2, P2, X2, ordering);
     const auto elapsed4 = std::chrono::duration_cast<time_interval_t>(myClock::now() - start4);
     cout << "count4: " << count4 << " in " << elapsed4.count() / 1000 << endl;
-
-    // cout << "count5: " << countUnions2(neighbourhoods3) << endl;
 
     return 0;
 }
