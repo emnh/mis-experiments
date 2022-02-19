@@ -36,29 +36,33 @@ vector<hoodtype> readGraph() {
         edges += hood.count();
     }
 
-    int node = 0;
-    int realEdges = 0;
-    ofstream myfile;
-    myfile.open("graph.txt");
-    myfile << neighbourhoods.size() << " " << edges / 2 << endl; 
-    for (hoodtype hood : neighbourhoods) {
-        node++;
-        // if (hood.count() > 0) {
-        // myfile << node;
-        bool first = true;
-        hood.enumerate([&myfile, &realEdges, &first] (int i) {
-            if (!first) {
-                myfile << " ";
-            }
-            first = false;
-            myfile << (i + 1);
-            realEdges++;
-            return false;
-        });
-        myfile << endl;
-        // }
+    bool writeGraphText = false;
+
+    if (writeGraphText) {
+      int node = 0;
+      int realEdges = 0;
+      ofstream myfile;
+      myfile.open("graph.txt");
+      myfile << neighbourhoods.size() << " " << edges / 2 << endl; 
+      for (hoodtype hood : neighbourhoods) {
+          node++;
+          // if (hood.count() > 0) {
+          // myfile << node;
+          bool first = true;
+          hood.enumerate([&myfile, &realEdges, &first] (int i) {
+              if (!first) {
+                  myfile << " ";
+              }
+              first = false;
+              myfile << (i + 1);
+              realEdges++;
+              return false;
+          });
+          myfile << endl;
+          // }
+      }
+      myfile.close();
     }
-    myfile.close();
 
     // int i = system("ndmetis -ccorder graph.txt");
     // cerr << "SKIPPING METIS" << endl;
