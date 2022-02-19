@@ -35,7 +35,7 @@ unsigned long long gf2_rank(vector<hoodtype> rows) {
                 lsb.set(i);
                 return true;
             });
-            for (int i = 0; i < rows.size(); i++) {
+            for (unsigned int i = 0; i < rows.size(); i++) {
                 if ((rows[i] & lsb) != hoodtype()) {
                     rows[i] = rows[i] ^ pivot_row;
                 }
