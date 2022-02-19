@@ -1,4 +1,4 @@
-unsigned long long countUnions(vector<hoodtype>& neighbourhoods) {
+unsigned long long countUnions(const vector<hoodtype>& neighbourhoods) {
     unordered_set<hoodtype, node_hash> s1(1 << neighbourhoods.size());
     vector<hoodtype> s2;
     s1.insert(hoodtype());
@@ -24,8 +24,8 @@ unsigned long long countUnions(vector<hoodtype>& neighbourhoods) {
     return s1.size();
 }
 
-unsigned long long countUnions2(vector<hoodtype>& neighbourhoods) {
-    unordered_set<hoodtype, node_hash> s1(1 << neighbourhoods.size());
+unsigned long long countUnions2(const vector<hoodtype>& neighbourhoods) {
+    unordered_set<hoodtype, node_hash> s1(1 << min(16, (int) neighbourhoods.size()));
     // unordered_set<hoodtype, node_hash> s1(256);
     vector<hoodtype> vs[neighbourhoods.size() + 1];
     // for (int i = 0; i <= neighbourhoods.size(); i++) {

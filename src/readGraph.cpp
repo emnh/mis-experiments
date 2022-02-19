@@ -61,8 +61,9 @@ vector<hoodtype> readGraph() {
     myfile.close();
 
     // int i = system("ndmetis -ccorder graph.txt");
-    cerr << "SKIPPING METIS" << endl;
+    // cerr << "SKIPPING METIS" << endl;
     // cerr << realEdges << endl;
+    cerr << "graph vertices edges: " << neighbourhoods.size() << " " << edges / 2 << endl; 
 
     return neighbourhoods;
 }

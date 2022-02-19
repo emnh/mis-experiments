@@ -20,7 +20,9 @@ const bool DEBUG = true;
 
 #include "bitset.cpp"
 
-constexpr int N = 512;
+constexpr int N = 256;
+// constexpr int N = 2048;
+// constexpr int N = 512;
 // constexpr int N = 128;
 typedef BitSet<N> hoodtype;
 
@@ -45,6 +47,9 @@ void FisherYates(vector<int>& player, int from) { //implementation of Fisher
 #include "connectedComponents.cpp"
 #include "ccmisProbe.cpp"
 #include "ccmis.cpp"
+#include "linearBoolWidth.cpp"
+#include "gf2rank.cpp"
+#include "linearRankWidth.cpp"
 #include "readGraph.cpp"
 #include "readOrdering.cpp"
 
@@ -136,14 +141,21 @@ int main() {
     hoodtype P2 = hoodtype();
     hoodtype X2 = hoodtype();
     vector<int> ordering;
+    vector<int> minOrdering;
     for (int i = 0; i < neighbourhoods3.size(); i++) {
         P2.set(i);
         ordering.push_back(i);
+        minOrdering.push_back(i);
     }
     sort(ordering.begin(), ordering.end(), 
             [&neighbourhoods3](const int& a, const int& b) 
                 { 
                     return neighbourhoods3[a].count() > neighbourhoods3[b].count();
+                });
+    sort(minOrdering.begin(), minOrdering.end(), 
+            [&neighbourhoods3](const int& a, const int& b) 
+                { 
+                    return neighbourhoods3[a].count() < neighbourhoods3[b].count();
                 });
     // vector<int> ordering = defaultOrdering; // readOrdering();
     
@@ -153,10 +165,22 @@ int main() {
     //     cerr << endl;
     // }
     
-    auto start4 = myClock::now();
-    unsigned long long count4 = CCMIS(0, neighbourhoods3, P2, P2, X2, ordering);
-    const auto elapsed4 = std::chrono::duration_cast<time_interval_t>(myClock::now() - start4);
-    cout << "count4: " << count4 << " in " << elapsed4.count() / 1000 << endl;
+    // auto start4 = myClock::now();
+    // unsigned long long count4 = CCMIS(0, neighbourhoods3, P2, P2, X2, ordering);
+    // const auto elapsed4 = std::chrono::duration_cast<time_interval_t>(myClock::now() - start4);
+    // cout << "count4: " << count4 << " in " << elapsed4.count() / 1000 << endl;
 
+    if (false) {
+        auto start5 = myClock::now();
+        uint64_t boolwidth = linearBoolWidth(minOrdering, neighbourhoods3);
+        const auto elapsed5 = std::chrono::duration_cast<time_interval_t>(myClock::now() - start5);
+        cout << "linear boolwidth UB: " << boolwidth << " in " << elapsed5.count() / 1000 << endl;
+    }
+   
+    auto start6 = myClock::now();
+    uint64_t rankwidth = linearRankWidth(minOrdering, neighbourhoods3);
+    const auto elapsed6 = std::chrono::duration_cast<time_interval_t>(myClock::now() - start6);
+    cout << "linear rankwidth UB: " << rankwidth << " in " << elapsed6.count() / 1000 << endl;
+    
     return 0;
 }

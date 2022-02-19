@@ -1,6 +1,6 @@
 unsigned long long CCMIS(
-    int depth, const vector<hoodtype>& neighbourhoods, const hoodtype& mask,
-    const hoodtype& P, const hoodtype& X, vector<int> ordering) {
+    const int depth, const vector<hoodtype>& neighbourhoods, const hoodtype& mask,
+    const hoodtype& P, const hoodtype& X, const vector<int>& ordering) {
     // for (int i = 0; i < depth; i++) {
     //     cerr << "--";
     // }
@@ -39,149 +39,161 @@ unsigned long long CCMIS(
     unsigned long long count = 0;
 
     int v = ordering[depth];
-    if (depth >= ordering.size()) {
-        throw out_of_range("ordering");
-    }
-    for (int i = depth; i < ordering.size(); i++) {
-        if (P.test(ordering[i])) {
-            v = ordering[i];
-            break;
-        }
-    }
-    if (!(P).test(v)) { 
-        P.enumerate([&v](int i) {
+    // if (depth >= ordering.size()) {
+    //     throw out_of_range("ordering");
+    // }
+    // for (int i = depth; i < ordering.size(); i++) {
+    //     if (P.test(ordering[i])) {
+    //         v = ordering[i];
+    //         break;
+    //     }
+    // }
+    // if (!(P).test(v)) { 
+    //     P.enumerate([&v](int i) {
+    //         v = i;
+    //         return true;
+    //     });
+    //     // throw out_of_range("v-ordering");
+    // }
+
+    int maxd = 0;
+    P.enumerate([&neighbourhoods, &mask, &maxd, &v] (int i) {
+        const int d = (neighbourhoods[i] & mask).count(); 
+        if (maxd <= d) {
+            maxd = d;
             v = i;
-            return true;
-        });
-        // throw out_of_range("v-ordering");
-    }
+        }
+        return false;
+    });
     // if (!P.test(v)) {
     //     throw out_of_range("v-ordering");
     // }
 
-    if (P.count() >= 32 && depth < 0) {
-        int maxd = 0;
-        vector<int> Pset;
-        for (int i = 0; i < depth; i++) {
-            Pset.push_back(ordering[i]);
-        }
-        P.enumerate([&neighbourhoods, &Pset, &P, &mask, &maxd, &v] (int i) {
-            const int d = (neighbourhoods[i]).count(); 
-            // const int d = (neighbourhoods[i]).count(); 
-            if (maxd <= d) {
-                maxd = d;
-                v = i;
-            }
-            Pset.push_back(i);
-            return false;
-        });
-        sort(Pset.begin(), Pset.end(), 
-            [&neighbourhoods](const int& a, const int& b) 
-                { 
-                    return neighbourhoods[a].count() > neighbourhoods[b].count();
-                });
+    // if (P.count() >= 32 && depth < 0) {
+    //     int maxd = 0;
+    //     vector<int> Pset;
+    //     for (int i = 0; i < depth; i++) {
+    //         Pset.push_back(ordering[i]);
+    //     }
+    //     P.enumerate([&neighbourhoods, &Pset, &P, &mask, &maxd, &v] (int i) {
+    //         const int d = (neighbourhoods[i]).count(); 
+    //         // const int d = (neighbourhoods[i]).count(); 
+    //         if (maxd <= d) {
+    //             maxd = d;
+    //             v = i;
+    //         }
+    //         Pset.push_back(i);
+    //         return false;
+    //     });
+    //     sort(Pset.begin(), Pset.end(), 
+    //         [&neighbourhoods](const int& a, const int& b) 
+    //             { 
+    //                 return neighbourhoods[a].count() > neighbourhoods[b].count();
+    //             });
         
-        int mindepth = 0;
-        int minv = v;
-        // vector<int> minOrdering = Pset;
-        vector<int> minOrdering = ordering;
+    //     int mindepth = 0;
+    //     int minv = v;
+    //     // vector<int> minOrdering = Pset;
+    //     vector<int> minOrdering = ordering;
 
-        const int maxj = 20;
+    //     const int maxj = 20;
 
-        for (int j = 0; j < maxj; j++) {
-            mindepth += CCMISProbe(depth, neighbourhoods, mask, P, X, minOrdering);
-        }
+    //     for (int j = 0; j < maxj; j++) {
+    //         mindepth += CCMISProbe(depth, neighbourhoods, mask, P, X, minOrdering);
+    //     }
 
-        for (int i = 0; i < Pset.size(); i++) {
+    //     for (int i = 0; i < Pset.size(); i++) {
             
-            // const int v2 = Pset[i];
+    //         // const int v2 = Pset[i];
 
-            vector<int> newOrdering =
-                vector<int>(ordering.begin(), ordering.end());
-            FisherYates(newOrdering, depth);
+    //         vector<int> newOrdering =
+    //             vector<int>(ordering.begin(), ordering.end());
+    //         FisherYates(newOrdering, depth);
 
-            int d = 0;
-            for (int j = 0; j < maxj; j++) {
-                d += CCMISProbe(depth, neighbourhoods, mask, P, X, newOrdering);
-            }
+    //         int d = 0;
+    //         for (int j = 0; j < maxj; j++) {
+    //             d += CCMISProbe(depth, neighbourhoods, mask, P, X, newOrdering);
+    //         }
                 
-            if (d <= mindepth) {
-                mindepth = d;
-                // minv = v2;
-                minOrdering = newOrdering;
+    //         if (d <= mindepth) {
+    //             mindepth = d;
+    //             // minv = v2;
+    //             minOrdering = newOrdering;
+    //         }
+    //     }
+    //     ordering = minOrdering;
+    //     v = ordering[depth];
+    //     for (int i = depth; i < ordering.size(); i++) {
+    //         if (P.test(ordering[i])) {
+    //             v = ordering[i];
+    //             break;
+    //         }
+    //     }
+    //     if (!(P).test(v)) {
+    //         P.enumerate([&v](int i) {
+    //             v = i;
+    //             return true;
+    //         });
+    //         // throw out_of_range("v-ordering");
+    //     }
+    // }
+
+    if (P.count() >= 10) {
+        vector<hoodtype> components;
+        bool isBipartite = false;
+        hoodtype left;
+        hoodtype right;
+        // TODO: Only check if it is connected if we removed a node
+        connectedComponents(
+            components,
+            neighbourhoods,
+            (P | X) & mask,
+            isBipartite,
+            left,
+            right);
+
+        if (components.size() > 1) {
+
+            count = 1;
+            for (hoodtype component : components) {
+                const hoodtype newmask = mask & component;
+                count *= CCMIS(depth, neighbourhoods, newmask, P & newmask, X & newmask, ordering);
             }
+
+            return count;
         }
-        ordering = minOrdering;
-        v = ordering[depth];
-        for (int i = depth; i < ordering.size(); i++) {
-            if (P.test(ordering[i])) {
-                v = ordering[i];
-                break;
-            }
-        }
-        if (!(P).test(v)) {
-            P.enumerate([&v](int i) {
-                v = i;
-                return true;
+
+        const bool countBipartite = false;
+        if (countBipartite && isBipartite &&
+            // max(left.count(), right.count()) >= 4 && 
+            min(left.count(), right.count()) <= 20) { 
+            // ((X - left) == hoodtype() ||
+            //  (X - right) == hoodtype())) {
+            vector<hoodtype> neighbourhoodsOfMin;
+            const hoodtype& minset = left.count() < right.count() ? left : right;
+            const hoodtype& maxset = left.count() < right.count() ? right : left;
+            // const hoodtype& minset = (X - left) == hoodtype() ? left : right;
+            // const hoodtype& maxset = (X - left) == hoodtype() ? right : left;
+            hoodtype NX;
+            X.enumerate([&neighbourhoods, &mask, &NX] (int i) {
+                NX = NX | (neighbourhoods[i] & mask); 
+                return false;
             });
-            // throw out_of_range("v-ordering");
+            ((minset - (X | NX)) & mask).enumerate([
+                &neighbourhoods, &mask, &X, &NX,
+                &neighbourhoodsOfMin, &maxset] (int i) {
+                neighbourhoodsOfMin.push_back(
+                    ((((neighbourhoods[i] | (X | NX)) & maxset)) & mask));
+                return false;
+            });
+            return countUnions2(neighbourhoodsOfMin);
+            // return countUnionsWithMask(neighbourhoodsOfMin, X);
+            // cerr << "bipartite: ";
+            // left.print(cerr);
+            // cerr << " ";
+            // right.print(cerr);
+            // cerr << endl;
         }
-    }
-
-    vector<hoodtype> components;
-    bool isBipartite = false;
-    hoodtype left;
-    hoodtype right;
-    // TODO: Only check if it is connected if we removed a node
-    connectedComponents(
-        components,
-        neighbourhoods,
-        (P | X) & mask,
-        isBipartite,
-        left,
-        right);
-
-    if (components.size() > 1) {
-
-        count = 1;
-        for (hoodtype component : components) {
-            const hoodtype newmask = mask & component;
-            count *= CCMIS(depth, neighbourhoods, newmask, P & newmask, X & newmask, ordering);
-        }
-
-        return count;
-    }
-
-    const bool countBipartite = false;
-    if (countBipartite && isBipartite &&
-        // max(left.count(), right.count()) >= 4 && 
-        min(left.count(), right.count()) <= 20) { 
-        // ((X - left) == hoodtype() ||
-        //  (X - right) == hoodtype())) {
-        vector<hoodtype> neighbourhoodsOfMin;
-        const hoodtype& minset = left.count() < right.count() ? left : right;
-        const hoodtype& maxset = left.count() < right.count() ? right : left;
-        // const hoodtype& minset = (X - left) == hoodtype() ? left : right;
-        // const hoodtype& maxset = (X - left) == hoodtype() ? right : left;
-        hoodtype NX;
-        X.enumerate([&neighbourhoods, &mask, &NX] (int i) {
-            NX = NX | (neighbourhoods[i] & mask); 
-            return false;
-        });
-        ((minset - (X | NX)) & mask).enumerate([
-            &neighbourhoods, &mask, &X, &NX,
-            &neighbourhoodsOfMin, &maxset] (int i) {
-            neighbourhoodsOfMin.push_back(
-                ((((neighbourhoods[i] | (X | NX)) & maxset)) & mask));
-            return false;
-        });
-        return countUnions2(neighbourhoodsOfMin);
-        // return countUnionsWithMask(neighbourhoodsOfMin, X);
-        // cerr << "bipartite: ";
-        // left.print(cerr);
-        // cerr << " ";
-        // right.print(cerr);
-        // cerr << endl;
     }
 
     
@@ -215,36 +227,36 @@ unsigned long long CCMIS(
     // (neighbourhoods[v] & mask).print(cerr);
     // cerr << endl;
 
-    const bool smallUnionsBruteForce = false;
-    if (smallUnionsBruteForce && P.count() <= 8) {
-        count = 0;
-        const int subsets = 1 << P.count();
-        for (uint64_t i = 0; i < subsets; i++) {
-            hoodtype subset;
-            hoodtype nbs;
-            hoodtype Xnew = X;
-            int seq = 0;
-            P.enumerate([
-                &neighbourhoods, &mask,
-                &subset, &nbs, &Xnew,
-                &seq, &i] (int j) {
-                if (i & (1ULL << seq)) {
-                    subset.set(j);
-                    nbs = nbs | (neighbourhoods[j] & mask);
-                } else {
-                    Xnew.set(j);
-                }
-                seq++;
-                return false;
-            });
-            if ((subset & nbs) == hoodtype() &&
-                (subset & Xnew) == hoodtype() &&
-                (Xnew - nbs) == hoodtype()) {
-                count++;
-            }
-        }
-        return count;
-    }
+    // const bool smallUnionsBruteForce = false;
+    // if (smallUnionsBruteForce && P.count() <= 8) {
+    //     count = 0;
+    //     const int subsets = 1 << P.count();
+    //     for (uint64_t i = 0; i < subsets; i++) {
+    //         hoodtype subset;
+    //         hoodtype nbs;
+    //         hoodtype Xnew = X;
+    //         int seq = 0;
+    //         P.enumerate([
+    //             &neighbourhoods, &mask,
+    //             &subset, &nbs, &Xnew,
+    //             &seq, &i] (int j) {
+    //             if (i & (1ULL << seq)) {
+    //                 subset.set(j);
+    //                 nbs = nbs | (neighbourhoods[j] & mask);
+    //             } else {
+    //                 Xnew.set(j);
+    //             }
+    //             seq++;
+    //             return false;
+    //         });
+    //         if ((subset & nbs) == hoodtype() &&
+    //             (subset & Xnew) == hoodtype() &&
+    //             (Xnew - nbs) == hoodtype()) {
+    //             count++;
+    //         }
+    //     }
+    //     return count;
+    // }
 
     {
         hoodtype PminNv = P - (neighbourhoods[v] & mask);
