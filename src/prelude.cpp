@@ -21,7 +21,8 @@ const bool DEBUG = true;
 
 #include "bitset.cpp"
 
-constexpr int N = 512;
+constexpr int N = 8192;
+// constexpr int N = 512;
 // constexpr int N = 2048;
 // constexpr int N = 512;
 // constexpr int N = 128;

@@ -32,21 +32,21 @@ unsigned long long linearRankWidthHelper(const vector<int>& ordering, unsigned i
     return cutrank;
 }
 
-unsigned long long linearRankWidth(vector<int> ordering, const vector<hoodtype>& neighbourhoods, bool greedy = true) {
+unsigned long long linearRankWidth(vector<int> ordering, const vector<hoodtype>& neighbourhoods, unsigned int partiallyOrdered = 0, bool greedy = true) {
     unsigned long long ret = 0;
-    vector<int> maxOrdering;
+    // vector<int> maxOrdering;
 
-    for (unsigned int i = 0; i < ordering.size(); i++) {
-        maxOrdering.push_back(ordering[i]);
-    }
-    sort(maxOrdering.begin(), maxOrdering.end(), 
-        [&neighbourhoods](const int& a, const int& b) 
-            { 
-                return neighbourhoods[a].count() > neighbourhoods[b].count();
-            });
+    // for (unsigned int i = 0; i < ordering.size(); i++) {
+    //     maxOrdering.push_back(ordering[i]);
+    // }
+    // sort(maxOrdering.begin(), maxOrdering.end(), 
+    //     [&neighbourhoods](const int& a, const int& b) 
+    //         { 
+    //             return neighbourhoods[a].count() > neighbourhoods[b].count();
+    //         });
     
     for (unsigned int i = 0; i < ordering.size(); i++) {
-        if (greedy) {
+        if (greedy && i >= partiallyOrdered) {
             unsigned long long bestRank = 1ULL << 62;
             int best = i;
             for (unsigned int j = i + 1; j < ordering.size(); j++) {
