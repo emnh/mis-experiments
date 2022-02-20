@@ -5,6 +5,7 @@
 #include "ccmis.cpp"
 #include "linearBoolWidth.cpp"
 #include "gf2rank.cpp"
+#include "treap.cpp"
 #include "linearRankWidth.cpp"
 #include "readGraph.cpp"
 #include "readOrdering.cpp"
@@ -29,9 +30,14 @@ void setStackSize() {
     }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
     
     setStackSize();
+
+    if (argc > 1 && strcmp(argv[1], "convert") == 0) {
+        readGraph(true);
+        return 0;
+    }
 
     vector<hoodtype> neighbourhoods;
     const int maxi = 20;
@@ -137,6 +143,11 @@ int main() {
     uint64_t rankwidth = linearRankWidth(ordering, neighbourhoods3);
     const auto elapsed6 = std::chrono::duration_cast<time_interval_t>(myClock::now() - start6);
     cout << "linear rankwidth UB: " << rankwidth << " in " << elapsed6.count() / 1000 << endl;
+
+    auto start7 = myClock::now();
+    uint64_t treaprankwidth = treapRankWidth(ordering, neighbourhoods3);
+    const auto elapsed7 = std::chrono::duration_cast<time_interval_t>(myClock::now() - start7);
+    cout << "treap rankwidth UB: " << treaprankwidth << " in " << elapsed7.count() / 1000 << endl;
     
     return 0;
 }

@@ -12,6 +12,7 @@
 #include <map>
 #include <algorithm>
 #include <cassert>
+#include <cstring>
 
 using namespace std;
 using time_interval_t = std::chrono::microseconds;

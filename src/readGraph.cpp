@@ -1,4 +1,4 @@
-vector<hoodtype> readGraph() {
+vector<hoodtype> readGraph(bool printAlphaZeroFormat = false) {
     // string a, b;
     // int c, d;
     // cin << a << b << c << d;
@@ -67,7 +67,22 @@ vector<hoodtype> readGraph() {
     // int i = system("ndmetis -ccorder graph.txt");
     // cerr << "SKIPPING METIS" << endl;
     // cerr << realEdges << endl;
-    cerr << "graph vertices edges: " << neighbourhoods.size() << " " << edges / 2 << endl; 
-
+    if (printAlphaZeroFormat) {
+      int node = 0;
+      ofstream myfile;
+      myfile.open("alpha.txt");
+      myfile << neighbourhoods.size() << " " << edges << endl; 
+      for (hoodtype hood : neighbourhoods) {
+          node++;
+          hood.enumerate([&node, &myfile] (int i) {
+              myfile << (node - 1) << " " << (i - 1) << endl;
+              return false;
+          });
+      }
+      myfile.close();
+    } else {
+        cerr << "graph vertices edges: " << neighbourhoods.size() << " " << edges / 2 << endl; 
+    }
+    
     return neighbourhoods;
 }
